@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLAN SPACE STUDIO | 報價診斷器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Noto Sans TC', 'Helvetica Neue', Arial, sans-serif; 
+            background-color: #f9f9f9;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+        
+        .input-field {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            background-color: white;
+            outline: none;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+        .input-field:focus {
+            border-color: #111827;
+            box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.1);
+        }
+        .section-title {
+            font-size: 0.85rem;
+            letter-spacing: 0.1em;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+        }
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background-color: #e5e7eb;
+            margin-left: 1rem;
+        }
+        
+        /* Modal Animation */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.3s ease-out; }
+        .modal-leave { opacity: 1; transform: scale(1); }
+        .modal-leave-active { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-in; }
+    </style>
+</head>
+<body class="text-gray-900 min-h-screen">
+
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="text-xl font-bold tracking-[0.2em] uppercase">Plan Space</div>
+            <div class="text-xs text-gray-500 tracking-widest hidden sm:block">室內裝修診斷器</div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
+        <div class="text-center mb-12">
+            <h1 class="text-2xl lg:text-3xl font-light mb-4 text-gray-800">專屬空間方案診斷</h1>
+            <p class="text-gray-500 text-sm max-w-2xl mx-auto leading-relaxed">
+                透過簡單幾個問題，系統將為您即時運算概略預算帶與風格建議。<br class="hidden sm:block">填寫完成後可一鍵複製需求，快速與我們的設計團隊預約深度諮詢。
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <div class="lg:col-span-7 space-y-10 bg-white p-6 sm:p-10 rounded-2xl shadow-sm border border-gray-100">
+                
+                <!-- 區塊 1: 基本空間資料 -->
+                <section>
+                    <h2 class="section-title">01. 空間基本資料</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">空間類型與屋況</label>
+                            <select id="spaceType" class="input-field">
+                                <option value="residential_new">住宅 - 新成屋 (5年內)</option>
+                                <option value="residential_old">住宅 - 老屋翻新 (5年以上)</option>
+                                <option value="commercial_store">商空 - 店面</option>
+                                <option value="commercial_office">商空 - 辦公室</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">所在地區</label>
+                            <select id="region" class="input-field">
+                                <option value="taipei">台北市</option>
+                                <option value="newtaipei">新北市</option>
+                                <option value="taoyuan">桃園市</option>
+                                <option value="hsinchu">新竹縣市</option>
+                                <option value="taichung">台中市</option>
+                                <option value="other">其他地區 (需加收跨區費)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">實際裝修坪數 (坪)</label>
+                            <input type="number" id="sqFeet" value="25" min="1" class="input-field" placeholder="請輸入實內坪數">
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">現有/期望格局</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="layoutRoom" value="3" min="0" class="input-field text-center px-1" placeholder="房"><span class="text-sm">房</span>
+                                <input type="number" id="layoutLiving" value="2" min="0" class="input-field text-center px-1" placeholder="廳"><span class="text-sm">廳</span>
+                                <input type="number" id="layoutBath" value="2" min="0" class="input-field text-center px-1" placeholder="衛"><span class="text-sm">衛</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 區塊 2: 設計與工程需求 -->
+                <section>
+                    <h2 class="section-title">02. 設計與工程需求</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">裝修等級定位</label>
+                            <select id="renovationLevel" class="input-field">
+                                <option value="basic">基礎實用 (重視收納與機能，減少裝飾)</option>
+                                <option value="standard" selected>中階平衡 (兼顧質感設計與預算控制)</option>
+                                <option value="premium">高階訂製 (頂級材質、特殊漆、進口五金)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">風格偏好</label>
+                            <select id="stylePreference" class="input-field">
+                                <option value="modern">現代極簡 Modern Minimal</option>
+                                <option value="japandi">日式北歐 Modern Japandi</option>
+                                <option value="wabi">侘寂風 Wabi-Sabi</option>
+                                <option value="cream">奶油風 Creamy Style</option>
+                                <option value="industrial">工業風 Industrial</option>
+                                <option value="luxury">現代奢華 Modern Luxury</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">您的預算範圍</label>
+                            <select id="budgetRange" class="input-field">
+                                <option value="under1m">100萬 以下</option>
+                                <option value="1mTo3m" selected>100萬 ~ 300萬</option>
+                                <option value="3mTo5m">300萬 ~ 500萬</option>
+                                <option value="above5m">500萬 以上</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">期望工期</label>
+                            <select id="timeline" class="input-field">
+                                <option value="urgent">越快越好 (3個月內)</option>
+                                <option value="normal" selected>一般排程 (3-6個月)</option>
+                                <option value="flexible">時間彈性 (6個月以上)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="includeFurniture" class="w-5 h-5 text-gray-900 border-gray-300 rounded focus:ring-gray-900">
+                            <span class="text-sm font-medium text-gray-700">需要「軟裝/家具/家電」整體規劃與代購服務</span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-2 ml-8">勾選後，系統將為您預估軟裝採購預算及代購服務費(5%)，讓全室風格更加完整一致。</p>
+                    </div>
+                </section>
+
+                <!-- 區塊 3: 聯絡資訊 -->
+                <section>
+                    <h2 class="section-title">03. 業主聯絡資訊</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">聯絡人姓名</label>
+                            <input type="text" id="clientName" class="input-field" placeholder="例如：王先生 / 陳小姐">
+                        </div>
+                        <div>
+                            <label class="block text-sm mb-2 text-gray-700">聯絡電話</label>
+                            <input type="tel" id="clientPhone" class="input-field" placeholder="09XX-XXX-XXX">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm mb-2 text-gray-700">Line ID 或 其他備註</label>
+                            <input type="text" id="clientLine" class="input-field" placeholder="請輸入 Line ID 以便專人聯繫">
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- 報價診斷結果 (Sticky) -->
+            <div class="lg:col-span-5 relative">
+                <div class="sticky top-24 bg-gray-200 text-gray-900 p-8 rounded-2xl shadow-xl flex flex-col h-[calc(100vh-8rem)] min-h-[650px] border border-gray-300">
+                    <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                        <div class="mb-8">
+                            <h3 class="text-sm text-gray-500 tracking-widest uppercase mb-2">Estimated Range</h3>
+                            <h2 class="text-xl font-medium mb-1">工程概估總價 (不含軟裝)</h2>
+                            <div class="text-3xl sm:text-4xl font-bold text-gray-900 mt-3" id="resBudgetBand">$0 萬 ~ $0 萬</div>
+                            <p class="text-xs text-gray-500 mt-3" id="resPricePerPing">換算單坪造價約 $0萬/坪 ~ $0萬/坪</p>
+                        </div>
+
+                        <div class="w-full h-px bg-gray-300 my-6"></div>
+
+                        <!-- 診斷建議 -->
+                        <div class="mb-6">
+                            <h4 class="text-xs text-gray-500 tracking-widest uppercase mb-3">Diagnostic Suggestion</h4>
+                            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                <p class="text-sm text-gray-700 leading-relaxed" id="resSuggestion">
+                                    載入分析中...
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <p class="text-xs text-gray-500 mt-2 text-center mb-6">本報價適用 2026 市場行情價</p>
+
+                        <!-- 費用明細預估 -->
+                        <div>
+                            <h4 class="text-xs text-gray-500 tracking-widest uppercase mb-4">Cost Breakdown (Avg)</h4>
+                            <div class="space-y-4 text-sm font-light">
+                                <div class="flex justify-between items-center bg-white p-2 rounded shadow-sm border border-gray-100">
+                                    <span class="text-gray-700">丈量費 <br><span class="text-[10px] text-gray-500">純現場丈量＋基本紀錄 (簽約後可折抵)</span></span>
+                                    <span id="resMeasure" class="font-medium text-gray-900">NT$ 0</span>
+                                </div>
+                                <div class="flex justify-between items-center bg-white p-2 rounded shadow-sm border border-gray-100 mt-2">
+                                    <span class="text-gray-700">提案費 <br><span class="text-[10px] text-gray-500">概念設計＋平面方案 (簽約後可折抵)</span></span>
+                                    <span id="resProposal" class="font-medium text-gray-900">NT$ 0</span>
+                                </div>
+                                <div class="flex justify-between items-center mt-4">
+                                    <span class="text-gray-600">設計費用 <span id="resDesignDesc" class="text-[10px] text-gray-400"></span></span>
+                                    <span id="resDesign" class="font-medium text-gray-800">NT$ 0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600">預估工程造價均值</span>
+                                    <span id="resProjectAvg" class="font-medium text-gray-800">NT$ 0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600">工程監管費 <span class="text-[10px] text-gray-400">(工程造價 10%)</span></span>
+                                    <span id="resSupervision" class="font-medium text-gray-800">NT$ 0</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600">營業稅 <span class="text-[10px] text-gray-400">(工程造價 5%)</span></span>
+                                    <span id="resTax" class="font-medium text-gray-800">NT$ 0</span>
+                                </div>
+                                
+                                <div id="furnitureBlock" class="hidden pt-4 mt-4 border-t border-gray-300 space-y-4">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-gray-500">軟裝家具/家電 (預估額度)</span>
+                                        <span id="resFurniture" class="text-gray-500">NT$ 0</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-gray-500">軟裝代購服務費 <span class="text-[10px]">(額度 5%)</span></span>
+                                        <span id="resService" class="text-gray-500">NT$ 0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 動作按鈕 -->
+                    <div class="pt-6 mt-6 border-t border-gray-300">
+                        <button onclick="submitAndCopy()" class="w-full bg-gray-900 text-white py-4 rounded-lg font-medium tracking-widest hover:bg-gray-800 transition-colors duration-300 flex items-center justify-center space-x-2 shadow-md">
+                            <span>送出需求並複製表單</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                        </button>
+                        <p class="text-center text-[10px] text-gray-500 mt-3">點擊後將為您複製詳細需求清單，請直接傳送給官方客服進行預約。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 客製化訊息彈窗 (取代 alert) -->
+    <div id="customModal" class="fixed inset-0 z-50 hidden items-center justify-center">
+        <div class="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 relative z-10 shadow-2xl modal-enter" id="modalContent">
+            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-center text-gray-900 mb-2">預約資料已準備就緒</h3>
+            <p class="text-sm text-gray-600 text-center mb-6" id="modalMessage">
+                您的專屬需求表單已成功複製！<br>請前往我們的 LINE 官方帳號貼上訊息，設計師將會盡快與您聯繫。
+            </p>
+            <button onclick="closeModal()" class="w-full bg-gray-900 text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition">
+                我知道了
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 常數設定
+        const BASE_RATES = {
+            'residential_new': { min: 50000, max: 90000, designRate: 5000 },
+            'residential_old': { min: 100000, max: 180000, designRate: 8000 },
+            'commercial_store': { min: 60000, max: 140000, designRate: 5000 },
+            'commercial_office': { min: 50000, max: 120000, designRate: 8000 }
+        };
+
+        const LEVEL_MULTIPLIER = {
+            'basic': 1.0,
+            'standard': 1.2,
+            'premium': 1.6
+        };
+
+        const STYLE_MULTIPLIER = {
+            'modern': 1.0,
+            'japandi': 1.05,
+            'wabi': 1.2, // 侘寂需要特殊漆與天然材質
+            'cream': 1.1,
+            'industrial': 0.95, // 較少包覆工程
+            'luxury': 1.3
+        };
+
+        function formatCurrency(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        // 核心計算邏輯
+        function calculate() {
+            const spaceType = document.getElementById('spaceType').value;
+            const sqFeet = Math.max(1, parseFloat(document.getElementById('sqFeet').value) || 0);
+            const level = document.getElementById('renovationLevel').value;
+            const style = document.getElementById('stylePreference').value;
+            const includeFurniture = document.getElementById('includeFurniture').checked;
+
+            const baseData = BASE_RATES[spaceType];
+            const multiplier = LEVEL_MULTIPLIER[level] * STYLE_MULTIPLIER[style];
+
+            // 1. 單坪造價區間
+            const minPerPing = baseData.min * multiplier;
+            const maxPerPing = baseData.max * multiplier;
+
+            // 2. 總工程造價區間
+            const minProject = minPerPing * sqFeet;
+            const maxProject = maxPerPing * sqFeet;
+            const avgProject = (minProject + maxProject) / 2;
+
+            // 3. 費用明細
+            // 丈量費 (固定 1500)
+            const measureFee = 1500;
+            // 提案費 (固定 3000)
+            const proposalFee = 3000;
+            
+            // 設計費
+            const designFee = baseData.designRate * sqFeet;
+            // 監管費
+            const supervisionFee = avgProject * 0.1;
+            // 營業稅 (工程造價的 5%)
+            const taxFee = avgProject * 0.05;
+
+            // 軟裝費 (以工程均值 30% 概估)
+            let furnitureFee = 0;
+            let serviceFee = 0;
+            const furnitureBlock = document.getElementById('furnitureBlock');
+            
+            if (includeFurniture) {
+                furnitureFee = avgProject * 0.3;
+                serviceFee = furnitureFee * 0.05;
+                furnitureBlock.classList.remove('hidden');
+            } else {
+                furnitureBlock.classList.add('hidden');
+            }
+
+            // 更新 UI
+            // 金額轉換為「萬」
+            const minWan = (minProject / 10000).toFixed(1);
+            const maxWan = (maxProject / 10000).toFixed(1);
+            const minPingWan = (minPerPing / 10000).toFixed(1);
+            const maxPingWan = (maxPerPing / 10000).toFixed(1);
+
+            document.getElementById('resBudgetBand').innerText = `${minWan} 萬 ~ ${maxWan} 萬`;
+            document.getElementById('resPricePerPing').innerText = `換算單坪造價約 ${minPingWan}萬/坪 ~ ${maxPingWan}萬/坪`;
+
+            document.getElementById('resMeasure').innerText = `NT$ ${formatCurrency(Math.round(measureFee))}`;
+            document.getElementById('resProposal').innerText = `NT$ ${formatCurrency(Math.round(proposalFee))}`;
+            document.getElementById('resDesign').innerText = `NT$ ${formatCurrency(Math.round(designFee))}`;
+            document.getElementById('resDesignDesc').innerText = `(@${baseData.designRate}/坪)`;
+            document.getElementById('resProjectAvg').innerText = `NT$ ${formatCurrency(Math.round(avgProject))}`;
+            document.getElementById('resSupervision').innerText = `NT$ ${formatCurrency(Math.round(supervisionFee))}`;
+            document.getElementById('resTax').innerText = `NT$ ${formatCurrency(Math.round(taxFee))}`;
+            
+            document.getElementById('resFurniture').innerText = `NT$ ${formatCurrency(Math.round(furnitureFee))}`;
+            document.getElementById('resService').innerText = `NT$ ${formatCurrency(Math.round(serviceFee))}`;
+
+            // 更新診斷建議文案
+            updateSuggestion(spaceType, level, style, includeFurniture);
+        }
+
+        function updateSuggestion(spaceType, level, style, includeFurniture) {
+            let text = "";
+            
+            // 針對屋況
+            if(spaceType === 'residential_old') {
+                text += "針對老屋翻新，我們強烈建議保留 40%-50% 的預算於「基礎工程」(如水電管線重拉、防水、鋁窗更新) 以確保居住安全。";
+            } else if(spaceType === 'residential_new') {
+                text += "新成屋具備基礎優勢，預算可多著重於「視覺風格營造」與「客製化收納櫃體」。";
+            } else {
+                text += "商業空間著重於「動線規劃、消防法規與商業視覺」，我們將協助打造符合品牌調性的空間。";
+            }
+
+            // 針對風格與等級
+            const styleName = document.getElementById('stylePreference').options[document.getElementById('stylePreference').selectedIndex].text;
+            if(style === 'wabi' || style === 'luxury') {
+                text += `您選擇的【${styleName}】與進階裝修設定，工程上將會運用較多特殊塗料、實木皮或天然石材，工法要求較高，質感亦最為出色。`;
+            } else {
+                text += `【${styleName}】風格能帶來舒適耐看的空間氛圍，我們將利用材質色彩搭配，在預算內為您達到最佳效果。`;
+            }
+
+            if(includeFurniture) {
+                text += " 同時，加上由專業軟裝師統籌的家具與家電規劃，能確保完工後的空間完整度達到 100%。";
+            }
+
+            document.getElementById('resSuggestion').innerText = text;
+        }
+
+        function submitAndCopy() {
+            const name = document.getElementById('clientName').value || "未填寫";
+            const phone = document.getElementById('clientPhone').value || "未填寫";
+            const line = document.getElementById('clientLine').value || "未填寫";
+            
+            const spaceTypeName = document.getElementById('spaceType').options[document.getElementById('spaceType').selectedIndex].text;
+            const regionName = document.getElementById('region').options[document.getElementById('region').selectedIndex].text;
+            const sqFeet = document.getElementById('sqFeet').value;
+            const layout = `${document.getElementById('layoutRoom').value}房 ${document.getElementById('layoutLiving').value}廳 ${document.getElementById('layoutBath').value}衛`;
+            
+            const levelName = document.getElementById('renovationLevel').options[document.getElementById('renovationLevel').selectedIndex].text;
+            const styleName = document.getElementById('stylePreference').options[document.getElementById('stylePreference').selectedIndex].text;
+            const budgetName = document.getElementById('budgetRange').options[document.getElementById('budgetRange').selectedIndex].text;
+            const timelineName = document.getElementById('timeline').options[document.getElementById('timeline').selectedIndex].text;
+
+            const budgetBand = document.getElementById('resBudgetBand').innerText;
+            const avgProject = document.getElementById('resProjectAvg').innerText;
+            const supervisionText = document.getElementById('resSupervision').innerText;
+            const taxText = document.getElementById('resTax').innerText;
+            
+            let furnitureText = "軟裝家具家電：客戶自理";
+            if(document.getElementById('includeFurniture').checked) {
+                furnitureText = `軟裝家具預估：${document.getElementById('resFurniture').innerText}\n├ 代購服務費：${document.getElementById('resService').innerText}`;
+            }
+
+            const exportText = `【 PLAN SPACE 室內裝修預約諮詢 】
+=============================
+📋 業主聯絡資訊
+姓名：${name}
+電話：${phone}
+LINE ID：${line}
+
+🏠 空間基本資料
+類型：${spaceTypeName}
+地區：${regionName}
+實內坪數：${sqFeet} 坪
+預期格局：${layout}
+
+✨ 設計需求
+裝修等級：${levelName}
+偏好風格：${styleName}
+您的預算：${budgetName}
+期望工期：${timelineName}
+
+💰 系統概估結果 (適用 2026 市場行情價)
+預估工程總價：${budgetBand}
+(工程造價均值：${avgProject})
+工程監管費 (10%)：${supervisionText}
+營業稅 (5%)：${taxText}
+${furnitureText}
+=============================
+設計師您好，我已透過官網模擬器完成初步評估，希望能與您預約進一步諮詢。`;
+
+            // 使用 document.execCommand 進行安全複製
+            fallbackCopyTextToClipboard(exportText);
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            
+            // 避免在畫面中產生滾動
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+            
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                var successful = document.execCommand('copy');
+                if(successful) {
+                    showModal();
+                } else {
+                    console.error('Fallback: Copying text command was unsuccessful');
+                    alert('複製失敗，請手動複製內容。'); // 極端例外防線
+                }
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+            }
+            
+            document.body.removeChild(textArea);
+        }
+
+        // Modal 操作
+        function showModal() {
+            const modal = document.getElementById('customModal');
+            const content = document.getElementById('modalContent');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // 觸發動畫
+            setTimeout(() => {
+                content.classList.remove('modal-enter');
+                content.classList.add('modal-enter-active');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('customModal');
+            const content = document.getElementById('modalContent');
+            
+            content.classList.remove('modal-enter-active');
+            content.classList.add('modal-leave-active');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                content.classList.remove('modal-leave-active');
+                content.classList.add('modal-enter'); // reset
+            }, 200);
+        }
+
+        // 綁定事件監聽器：當任何輸入改變時，即時更新報價
+        document.querySelectorAll('input, select').forEach(el => {
+            el.addEventListener('input', calculate);
+            el.addEventListener('change', calculate);
+        });
+
+        // 初始執行一次運算
+        window.onload = function() {
+            calculate();
+        };
+    </script>
+</body>
+</html>
