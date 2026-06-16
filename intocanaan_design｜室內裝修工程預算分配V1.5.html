@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INTOCANAAN DESIGN | 預算分配模擬器</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            black: '#111827',
+                            dark: '#1f2937',
+                            gray: '#4b5563',
+                            light: '#f3f4f6',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans TC"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap');
+
+        body {
+            background-color: #ffffff;
+            color: #111827;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            width: 100%;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #111827;
+            cursor: pointer;
+            margin-top: -6px;
+            border: 2px solid #ffffff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #e5e7eb;
+            border-radius: 2px;
+        }
+        input[type=range]:disabled::-webkit-slider-thumb {
+            background: #9ca3af;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Clean number input */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        /* Print Styles */
+        @media print {
+            body { padding: 0; margin: 0; }
+            .print\:hidden { display: none !important; }
+            .print\:w-full { width: 100% !important; }
+            .print\:border-none { border: none !important; }
+            .print\:text-black { color: #000 !important; }
+            .shadow-sm, .shadow-lg, .shadow-xl { box-shadow: none !important; }
+            .print-page-break { page-break-before: always; break-before: page; }
+            thead { background-color: #111827 !important; color: #ffffff !important; }
+            th { color: #ffffff !important; }
+            input[type=number], input[type=text] { 
+                border: none; 
+                background: transparent; 
+                padding: 0; 
+                margin: 0;
+                text-align: right;
+            }
+            #budgetTableBody tr { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 font-sans">
+
+    <div class="max-w-[1400px] mx-auto space-y-12">
+        
+        <!-- Header -->
+        <header class="text-center pt-8 pb-4 relative">
+            <h1 class="text-3xl md:text-4xl tracking-[0.2em] font-medium text-brand-black uppercase">INTOCANAAN DESIGN</h1>
+            <div class="w-12 h-[2px] bg-brand-black mx-auto mt-6 mb-4"></div>
+            <p class="text-brand-gray text-sm tracking-[0.1em]">室內裝修工程預算分配</p>
+            
+            <!-- Cloud Status Indicator & Login Button -->
+            <div class="absolute top-0 right-0 flex items-center gap-3">
+                <div class="flex items-center gap-2 px-3 py-1 bg-gray-50 rounded-full text-xs font-medium border border-gray-200">
+                    <i data-lucide="cloud" id="cloudIcon" class="w-4 h-4 text-gray-400"></i>
+                    <span id="cloudStatusText" class="text-gray-500 tracking-wider">連線中...</span>
+                </div>
+                <button id="authBtn" onclick="toggleGoogleLogin()" class="px-4 py-1.5 bg-[#4285F4] text-white rounded text-xs tracking-widest hover:bg-blue-600 transition flex items-center gap-2 shadow-sm">
+                    <i data-lucide="log-in" class="w-3 h-3"></i> <span id="authBtnText">Google 登入</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Layout Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            
+            <!-- Left Column: Inputs & Total -->
+            <div class="lg:col-span-4 space-y-8 flex flex-col justify-center">
+                
+                <!-- Project Name Input -->
+                <div class="space-y-3">
+                    <div class="flex justify-between items-end">
+                        <label class="text-sm font-bold text-brand-black tracking-wide">專案名稱</label>
+                        <input type="text" id="projectName" value="新建裝修專案" onchange="updateState()" placeholder="請輸入專案名稱" class="text-xl font-bold text-right w-56 focus:outline-none bg-transparent print:border-none border-b border-gray-300 placeholder-gray-300"/>
+                    </div>
+                </div>
+
+                <!-- Preset Types -->
+                <div class="space-y-3 print:hidden">
+                    <label class="text-sm font-bold text-brand-black tracking-wide">專案類型 (套用預設配比)</label>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button onclick="applyPreset('new')" id="btnPreset-new" class="preset-btn text-left px-4 py-3 border border-brand-black ring-1 ring-brand-black bg-gray-50 rounded-md hover:bg-gray-50 transition-all">
+                            <div class="font-bold text-brand-black flex justify-between items-center">
+                                <span>A. 新成屋</span>
+                                <span class="text-xs font-normal text-brand-gray bg-white px-2 py-1 rounded border border-gray-200">預設: $70,000/坪</span>
+                            </div>
+                            <div class="text-xs text-brand-gray mt-1 tracking-wide">收費參考：$50,000 - $90,000 /坪</div>
+                        </button>
+                        <button onclick="applyPreset('old')" id="btnPreset-old" class="preset-btn text-left px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-all">
+                            <div class="font-bold text-brand-black flex justify-between items-center">
+                                <span>B. 老屋翻新</span>
+                                <span class="text-xs font-normal text-brand-gray bg-white px-2 py-1 rounded border border-gray-200">預設: $140,000/坪</span>
+                            </div>
+                            <div class="text-xs text-brand-gray mt-1 tracking-wide">收費參考：$120,000 - $180,000 /坪</div>
+                        </button>
+                        <button onclick="applyPreset('com')" id="btnPreset-com" class="preset-btn text-left px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-all">
+                            <div class="font-bold text-brand-black flex justify-between items-center">
+                                <span>C. 商空 / 辦公空間</span>
+                                <span class="text-xs font-normal text-brand-gray bg-white px-2 py-1 rounded border border-gray-200">預設: $80,000/坪</span>
+                            </div>
+                            <div class="text-xs text-brand-gray mt-1 tracking-wide">收費參考：$50,000 - $180,000 /坪</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Area Input -->
+                <div class="space-y-3">
+                    <div class="flex justify-between items-end">
+                        <label class="text-sm font-bold text-brand-black tracking-wide">實際裝修坪數</label>
+                        <div class="flex items-baseline gap-1">
+                            <input type="number" id="area" value="24" min="1" onchange="updateState()" class="text-xl font-bold text-right w-20 focus:outline-none bg-transparent print:border-none border-b border-gray-300"/>
+                            <span class="text-sm font-bold text-brand-black">坪</span>
+                        </div>
+                    </div>
+                    <input type="range" id="areaSlider" min="10" max="100" step="1" value="24" oninput="document.getElementById('area').value=this.value; updateState();" class="print:hidden"/>
+                </div>
+
+                <!-- Unit Price Input -->
+                <div class="space-y-3">
+                    <div class="flex justify-between items-end">
+                        <label class="text-sm font-bold text-brand-black tracking-wide">工程基礎單價 (不含稅管)</label>
+                        <div class="flex items-baseline gap-1">
+                            <input type="number" id="unitPriceInput" value="70000" min="1000" step="1000" onchange="updateUnitPrice(this.value)" class="text-xl font-bold text-right w-28 focus:outline-none bg-transparent print:border-none border-b border-gray-300"/>
+                            <span class="text-sm font-bold text-brand-black">元/坪</span>
+                        </div>
+                    </div>
+                    <input type="range" id="unitPriceSlider" min="20000" max="200000" step="5000" value="70000" oninput="updateUnitPrice(this.value)" class="print:hidden"/>
+                </div>
+
+                <!-- Total Summary display -->
+                <div class="pt-10 border-t border-gray-200">
+                    <p class="text-sm text-brand-gray font-medium mb-2 tracking-wide">專案總承攬金額 (含稅含管)</p>
+                    <div class="flex items-baseline gap-2 text-brand-black">
+                        <span class="text-3xl font-black">NT$</span>
+                        <span id="sumGrossTotal" class="text-5xl md:text-6xl font-black tracking-tight">0</span>
+                    </div>
+                </div>
+
+                <!-- Sub Summaries & Buttons -->
+                <div class="pt-6 space-y-6">
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <p class="text-xs text-brand-gray mb-1">工程造價 (未稅)</p>
+                            <p id="sumNetTotal" class="text-lg font-bold text-brand-black">NT$0</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-brand-gray mb-1">工程監管費 (10%)</p>
+                            <p id="sumManagement" class="text-lg font-bold text-brand-black">NT$0</p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-brand-gray mb-1">營業稅 (5%)</p>
+                            <p id="sumTax" class="text-lg font-bold text-brand-black">NT$0</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Export & Print Actions -->
+                    <div class="grid grid-cols-2 gap-4 pt-4 print:hidden">
+                        <button onclick="window.print()" class="w-full py-4 px-4 border border-brand-black text-brand-black text-sm font-medium tracking-widest hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                            <i data-lucide="printer" class="w-4 h-4"></i> 列印 PDF
+                        </button>
+                        <button onclick="exportToCSV()" class="w-full py-4 px-4 border border-brand-black text-brand-black text-sm font-medium tracking-widest hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                            <i data-lucide="download" class="w-4 h-4"></i> 下載 CSV
+                        </button>
+                        <button onclick="exportToJSON()" class="w-full py-4 px-4 border border-brand-black text-brand-black text-sm font-medium tracking-widest hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                            <i data-lucide="save" class="w-4 h-4"></i> 本機備份
+                        </button>
+                        <div class="relative w-full">
+                            <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importFromJSON(event)">
+                            <button onclick="document.getElementById('importJsonInput').click()" class="w-full h-full py-4 px-4 border border-brand-black text-brand-black text-sm font-medium tracking-widest hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                                <i data-lucide="folder-open" class="w-4 h-4"></i> 載入本機
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Cloud Sync Actions -->
+                    <div class="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 print:hidden">
+                        <button onclick="saveToCloud()" class="w-full py-4 px-4 bg-brand-black text-white text-sm font-medium tracking-widest hover:bg-gray-800 transition-colors flex items-center justify-center gap-2">
+                            <i data-lucide="cloud-upload" class="w-4 h-4"></i> 儲存至雲端
+                        </button>
+                        <button onclick="openCloudModal()" class="w-full py-4 px-4 bg-brand-black text-white text-sm font-medium tracking-widest hover:bg-gray-800 transition-colors flex items-center justify-center gap-2">
+                            <i data-lucide="library" class="w-4 h-4"></i> 雲端專案庫
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Bar Chart -->
+            <div class="lg:col-span-8 bg-gray-50/50 p-6 rounded-xl border border-gray-100 flex items-end">
+                <div class="w-full h-[400px] relative">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table Section -->
+        <div class="pt-8 print:pt-0 print-page-break">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[800px]">
+                    <thead class="bg-brand-black text-white text-sm tracking-wider">
+                        <tr>
+                            <th class="py-4 px-6 font-medium w-16 text-center">項次</th>
+                            <th class="py-4 px-6 font-medium w-48">工程項目</th>
+                            <th class="py-4 px-6 font-medium">工程規畫重點與執行細節</th>
+                            <th class="py-4 px-6 font-medium w-48 text-right print:w-24">預算配比 (%)</th>
+                            <th class="py-4 px-6 font-medium text-right w-40">預算分配 (TWD)</th>
+                            <th class="py-4 px-6 font-medium text-center w-20 print:hidden">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budgetTableBody" class="text-sm">
+                        <!-- Table Rows Generated Here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Cloud Project Modal -->
+    <div id="cloudModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white p-8 max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-gray-200">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <div>
+                    <h2 class="text-xl font-bold uppercase tracking-widest text-brand-black flex items-center gap-2">
+                        <i data-lucide="library" class="w-5 h-5"></i> 雲端專案庫
+                    </h2>
+                    <p class="text-xs text-gray-500 mt-1">選取要切換與載入的專案資料</p>
+                </div>
+                <button onclick="closeCloudModal()" class="text-gray-400 hover:text-brand-black transition-colors p-2">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <div id="cloudProjectList" class="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+                <div class="text-center py-10 text-gray-400 text-sm tracking-widest">
+                    <i data-lucide="loader" class="w-6 h-6 animate-spin mx-auto mb-2"></i> 讀取中...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic (Module) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // 加入 GoogleAuthProvider, signInWithPopup 與 signOut 模組
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global Setup
+        let state = {
+            projectName: '新建裝修專案',
+            area: 24,
+            unitPrice: 70000,
+            items: []
+        };
+        
+        let cloudProjects = []; // Store projects fetched from Firestore
+
+        const PRESETS_DATA = {
+            'new': {
+                unitPrice: 70000,
+                ratios: { 'demo': 2, 'windows': 1, 'masonry': 2, 'mep': 12, 'hvac': 15, 'ceiling': 10, 'cabinetry': 19.5, 'metal': 3, 'paint': 11, 'floor': 4, 'kitchen': 5, 'lighting': 2, 'bath': 2, 'stone': 3, 'glass': 3, 'hardware': 1.5, 'curtain': 0, 'other': 2, 'clean': 2 }
+            },
+            'old': {
+                unitPrice: 140000,
+                ratios: { 'demo': 7, 'windows': 10, 'masonry': 17, 'mep': 14, 'hvac': 8, 'ceiling': 6, 'cabinetry': 12, 'metal': 2, 'paint': 7, 'floor': 5, 'kitchen': 4, 'lighting': 1.5, 'bath': 3, 'stone': 0.5, 'glass': 1, 'hardware': 0.5, 'curtain': 0, 'other': 1.5, 'clean': 1 }
+            },
+            'com': {
+                unitPrice: 80000,
+                ratios: { 'demo': 6, 'windows': 2, 'masonry': 5, 'mep': 14, 'hvac': 13, 'ceiling': 11, 'cabinetry': 8, 'metal': 6, 'paint': 8, 'floor': 8, 'kitchen': 1, 'lighting': 6, 'bath': 1, 'stone': 1, 'glass': 6, 'hardware': 1, 'curtain': 0, 'other': 2, 'clean': 1 }
+            }
+        };
+
+        const INITIAL_ITEMS = [
+            { id: 'demo', name: '假設保護與拆除工程', desc: '施工前保護措施、既有裝修拆除、廢棄物清運與基礎清理作業。', ratio: 2, isEnabled: true },
+            { id: 'windows', name: '鋁窗工程', desc: '鋁窗、氣密窗、玻璃窗框與相關五金安裝工程。', ratio: 1, isEnabled: true },
+            { id: 'masonry', name: '泥作工程', desc: '砌磚、粉光、防水、貼磚與水泥基礎修整等施工。', ratio: 2, isEnabled: true },
+            { id: 'mep', name: '水電工程', desc: '全室給排水、電力配置、弱電管線與設備安裝工程，確保用電負載與安全。', ratio: 12, isEnabled: true },
+            { id: 'hvac', name: '空調工程', desc: '冷氣設備、冷媒管線、排水與空調系統安裝配置。', ratio: 15, isEnabled: true },
+            { id: 'ceiling', name: '木作天花隔間工程', desc: '天花板造型、輕隔間、包樑與木作基礎架構施工。', ratio: 10, isEnabled: true },
+            { id: 'cabinetry', name: '木作櫃工程', desc: '系統櫃、木作櫃體、收納櫃與展示櫃製作安裝。', ratio: 19.5, isEnabled: true },
+            { id: 'metal', name: '鐵工工程', desc: '鐵件結構、金屬框架、扶手、吊架與客製鐵件製作。', ratio: 3, isEnabled: true },
+            { id: 'paint', name: '油漆工程', desc: '牆面天花批土、底漆、面漆與特殊塗料表面處理工程。', ratio: 11, isEnabled: true },
+            { id: 'floor', name: '地坪工程', desc: '木地板、磁磚、石材、SPC 與地面整平施工。', ratio: 6, isEnabled: true },
+            { id: 'kitchen', name: '廚具工程', desc: '廚具設備、檯面、櫥櫃與廚房五金安裝配置。', ratio: 3, isEnabled: true },
+            { id: 'lighting', name: '燈具設備', desc: '照明燈具、軌道燈、崁燈與控制設備安裝。', ratio: 2, isEnabled: true },
+            { id: 'bath', name: '衛浴設備', desc: '馬桶、面盆、浴櫃、龍頭與衛浴配件安裝。', ratio: 2, isEnabled: true },
+            { id: 'stone', name: '人造石工程', desc: '人造石檯面、吧台、窗台與石材加工安裝。', ratio: 3, isEnabled: true },
+            { id: 'glass', name: '玻璃工程', desc: '明鏡、烤漆玻璃與淋浴間玻璃隔間。', ratio: 3, isEnabled: true },
+            { id: 'hardware', name: '五金設備', desc: '門鎖、把手、滑軌、鉸鏈與各式五金配件安裝。', ratio: 1.5, isEnabled: true },
+            { id: 'curtain', name: '窗簾工程(軟裝另計)', desc: '遮光布、紗簾、百葉窗等窗飾規劃。', ratio: 0, isEnabled: true },
+            { id: 'other', name: '其他工程', desc: '特殊客製項目、雜項施工與追加工程內容。', ratio: 2, isEnabled: true },
+            { id: 'clean', name: '清潔工程', desc: '完工細清、粉塵清潔與交屋前環境整理。', ratio: 2, isEnabled: true },
+        ];
+
+        state.items = JSON.parse(JSON.stringify(INITIAL_ITEMS));
+        let barChartInstance = null;
+
+        // Firebase Initialization
+        let auth, db, currentUser;
+        const appId = 'intocanaan-budget-app'; // 您可以自訂此系統的代號
+        
+        // 👇 1. 您只需要填寫這裡的 firebaseConfig，Client ID 由系統背景處理
+        const firebaseConfig = {
+            apiKey: "您的_API_KEY",
+            authDomain: "您的_PROJECT_ID.firebaseapp.com",
+            projectId: "您的_PROJECT_ID",
+            storageBucket: "您的_PROJECT_ID.appspot.com",
+            messagingSenderId: "您的_SENDER_ID",
+            appId: "您的_APP_ID"
+        };
+
+        async function initFirebase() {
+            if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey.includes("您的")) {
+                console.warn('Firebase config missing. Cloud sync disabled.');
+                document.getElementById('cloudStatusText').innerText = '未連接雲端';
+                document.getElementById('authBtn').classList.add('hidden'); // 金鑰未設定時隱藏登入按鈕
+                return;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+
+            try {
+                // 監聽使用者登入狀態
+                onAuthStateChanged(auth, user => {
+                    currentUser = user;
+                    const icon = document.getElementById('cloudIcon');
+                    const text = document.getElementById('cloudStatusText');
+                    const authBtnText = document.getElementById('authBtnText');
+                    
+                    if (user) {
+                        // 已登入狀態
+                        text.innerText = user.displayName ? `${user.displayName} 已連線` : '雲端已連線';
+                        icon.classList.replace('text-gray-400', 'text-green-500');
+                        authBtnText.innerText = '登出';
+                        fetchCloudProjects();
+                    } else {
+                        // 未登入狀態
+                        text.innerText = '請登入雲端';
+                        icon.classList.replace('text-green-500', 'text-gray-400');
+                        authBtnText.innerText = 'Google 登入';
+                        cloudProjects = []; // 清空本機暫存的專案列表
+                        renderCloudProjects();
+                    }
+                });
+            } catch (err) {
+                console.error("Firebase Auth Error:", err);
+                document.getElementById('cloudStatusText').innerText = '連線失敗';
+            }
+        }
+
+        // --- Google Login Action ---
+        window.toggleGoogleLogin = async function() {
+            if (!auth) return alert("請先在程式碼中設定 Firebase 金鑰");
+            
+            if (currentUser) {
+                // 若已登入則執行登出
+                await signOut(auth);
+            } else {
+                // 執行 Google 登入
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    console.error("Google 登入失敗", error);
+                    alert("登入失敗，請確認 Firebase 後台是否已啟用 Google 登入。");
+                }
+            }
+        };
+
+        // --- Cloud Sync API ---
+
+        window.saveToCloud = async function() {
+            if (!currentUser) return alert("雲端未連線，請確認網路狀態。");
+            
+            const projName = state.projectName.trim();
+            if (!projName) return alert("請先填寫「專案名稱」做為儲存識別！");
+
+            // Define path: /artifacts/{appId}/users/{userId}/projects/{projectName}
+            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'projects', projName);
+            
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> 儲存中...`;
+            lucide.createIcons();
+
+            try {
+                const payload = {
+                    ...state,
+                    updatedAt: new Date().toISOString()
+                };
+                await setDoc(docRef, payload);
+                
+                setTimeout(() => {
+                    btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> 儲存成功`;
+                    lucide.createIcons();
+                    setTimeout(() => btn.innerHTML = originalText, 2000);
+                }, 500);
+
+            } catch (error) {
+                console.error("Save to Cloud Error:", error);
+                alert("儲存失敗，請稍後再試。");
+                btn.innerHTML = originalText;
+            }
+        };
+
+        function fetchCloudProjects() {
+            if (!currentUser) return;
+            const colRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'projects');
+            
+            onSnapshot(colRef, (snapshot) => {
+                cloudProjects = [];
+                snapshot.forEach(doc => {
+                    cloudProjects.push({ id: doc.id, ...doc.data() });
+                });
+                // Sort by latest update
+                cloudProjects.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+                renderCloudProjects();
+            }, (error) => {
+                console.error("Snapshot error:", error);
+            });
+        }
+
+        window.openCloudModal = function() {
+            document.getElementById('cloudModal').classList.remove('hidden');
+            renderCloudProjects();
+        };
+
+        window.closeCloudModal = function() {
+            document.getElementById('cloudModal').classList.add('hidden');
+        };
+
+        function renderCloudProjects() {
+            const listDiv = document.getElementById('cloudProjectList');
+            if (cloudProjects.length === 0) {
+                listDiv.innerHTML = `
+                    <div class="text-center py-10 text-gray-400">
+                        <i data-lucide="folder-x" class="w-10 h-10 mx-auto mb-3 opacity-50"></i>
+                        <p class="text-sm tracking-widest">目前雲端沒有儲存任何專案</p>
+                    </div>`;
+                lucide.createIcons();
+                return;
+            }
+
+            let html = '';
+            cloudProjects.forEach(proj => {
+                const dateStr = new Date(proj.updatedAt).toLocaleString('zh-TW', {
+                    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+                });
+                const totalGross = Math.round(proj.area * proj.unitPrice * 1.15); // Quick rough estimate for display
+
+                html += `
+                    <div class="flex items-center justify-between p-4 border border-gray-200 hover:border-brand-black transition-colors bg-gray-50 group">
+                        <div class="flex-1 cursor-pointer" onclick="loadCloudProject('${proj.id}')">
+                            <h3 class="font-bold text-brand-black text-lg mb-1">${proj.projectName}</h3>
+                            <div class="flex gap-4 text-xs text-gray-500 font-medium">
+                                <span><i data-lucide="maximize" class="inline w-3 h-3 mr-1"></i>${proj.area} 坪</span>
+                                <span><i data-lucide="wallet" class="inline w-3 h-3 mr-1"></i>約 $${formatNum(totalGross)}</span>
+                                <span><i data-lucide="clock" class="inline w-3 h-3 mr-1"></i>${dateStr}</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="loadCloudProject('${proj.id}')" class="px-3 py-2 bg-brand-black text-white text-xs tracking-widest hover:bg-gray-800 transition">載入</button>
+                            <button onclick="deleteCloudProject('${proj.id}')" class="px-3 py-2 border border-red-200 text-red-500 text-xs hover:bg-red-50 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `;
+            });
+            listDiv.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        window.loadCloudProject = function(docId) {
+            const proj = cloudProjects.find(p => p.id === docId);
+            if (!proj) return;
+
+            // Apply Data
+            state.projectName = proj.projectName;
+            state.area = proj.area;
+            state.unitPrice = proj.unitPrice;
+            state.items = proj.items;
+
+            // Sync Form Inputs
+            document.getElementById('projectName').value = state.projectName;
+            document.getElementById('area').value = state.area;
+            document.getElementById('areaSlider').value = state.area;
+            document.getElementById('unitPriceInput').value = state.unitPrice;
+            document.getElementById('unitPriceSlider').value = state.unitPrice;
+
+            // Remove preset selection styles
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.classList.remove('border-brand-black', 'bg-gray-50', 'ring-1', 'ring-brand-black');
+                btn.classList.add('border-gray-300');
+            });
+
+            updateAll();
+            closeCloudModal();
+        };
+
+        window.deleteCloudProject = async function(docId) {
+            if(!confirm(`確定要從雲端永久刪除專案嗎？`)) return;
+            const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'projects', docId);
+            try {
+                await deleteDoc(docRef);
+            } catch(e) {
+                console.error("Delete error:", e);
+                alert("刪除失敗");
+            }
+        };
+
+
+        // --- Local App Logic ---
+
+        const formatCurrency = (val) => new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 0 }).format(Math.round(val));
+        const formatNum = (val) => new Intl.NumberFormat('zh-TW').format(Math.round(val));
+
+        window.initApp = function() {
+            lucide.createIcons();
+            updateAll();
+            initFirebase(); // Initialize cloud connection
+        }
+
+        window.applyPreset = function(type) {
+            const data = PRESETS_DATA[type];
+            state.unitPrice = data.unitPrice;
+            document.getElementById('unitPriceInput').value = data.unitPrice;
+            document.getElementById('unitPriceSlider').value = data.unitPrice;
+            
+            state.items.forEach(item => {
+                item.ratio = data.ratios[item.id] || 0;
+                item.isEnabled = true; 
+            });
+
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.classList.remove('border-brand-black', 'bg-gray-50', 'ring-1', 'ring-brand-black');
+                btn.classList.add('border-gray-300');
+            });
+            const activeBtn = document.getElementById(`btnPreset-${type}`);
+            activeBtn.classList.remove('border-gray-300');
+            activeBtn.classList.add('border-brand-black', 'bg-gray-50', 'ring-1', 'ring-brand-black');
+
+            updateAll();
+        }
+
+        window.updateState = function() {
+            state.projectName = document.getElementById('projectName').value;
+            state.area = Math.max(1, Number(document.getElementById('area').value) || 1);
+            
+            const up = Math.max(1, Number(document.getElementById('unitPriceInput').value) || 1);
+            state.unitPrice = up;
+            document.getElementById('unitPriceSlider').value = up;
+            document.getElementById('areaSlider').value = state.area;
+            
+            updateAll();
+        }
+
+        window.updateUnitPrice = function(val) {
+            const up = Math.max(1, Number(val));
+            state.unitPrice = up;
+            document.getElementById('unitPriceInput').value = up;
+            document.getElementById('unitPriceSlider').value = up;
+            updateAll();
+        }
+
+        window.handleToggle = function(id) {
+            const target = state.items.find(p => p.id === id);
+            const isTurningOff = target.isEnabled;
+
+            if (isTurningOff) {
+                const otherEnabled = state.items.filter(p => p.id !== id && p.isEnabled);
+                const totalOtherRatio = otherEnabled.reduce((sum, item) => sum + item.ratio, 0);
+                if (totalOtherRatio === 0) return; 
+
+                state.items.forEach(item => {
+                    if (item.id === id) {
+                        item.isEnabled = false;
+                        item._savedRatio = item.ratio;
+                        item.ratio = 0;
+                    } else if (item.isEnabled) {
+                        const proportion = item.ratio / totalOtherRatio;
+                        item.ratio = item.ratio + (target.ratio * proportion);
+                    }
+                });
+            } else {
+                const ratioToRestore = target._savedRatio || 5;
+                const currentEnabled = state.items.filter(p => p.isEnabled);
+                const totalCurrentRatio = currentEnabled.reduce((sum, item) => sum + item.ratio, 0);
+
+                state.items.forEach(item => {
+                    if (item.id === id) {
+                        item.isEnabled = true;
+                        item.ratio = ratioToRestore;
+                    } else if (item.isEnabled) {
+                        const proportion = item.ratio / totalCurrentRatio;
+                        item.ratio = Math.max(0, item.ratio - (ratioToRestore * proportion));
+                    }
+                });
+            }
+            updateAll();
+        }
+
+        window.handleRatioChange = function(id, newRatioValue) {
+            let newRatio = parseFloat(newRatioValue);
+            if (isNaN(newRatio)) newRatio = 0;
+            if (newRatio > 100) newRatio = 100;
+            if (newRatio < 0) newRatio = 0;
+
+            const target = state.items.find(p => p.id === id);
+            if (!target || !target.isEnabled) return;
+
+            const diff = newRatio - target.ratio;
+            const otherEnabled = state.items.filter(p => p.id !== id && p.isEnabled);
+            const totalOtherRatio = otherEnabled.reduce((sum, item) => sum + item.ratio, 0);
+
+            if (newRatio === 100) {
+                state.items.forEach(item => {
+                    if (item.id === id) item.ratio = 100;
+                    else item.ratio = 0;
+                });
+            } else {
+                if (totalOtherRatio === 0) return;
+                state.items.forEach(item => {
+                    if (item.id === id) item.ratio = newRatio;
+                    else if (item.isEnabled) {
+                        const proportion = item.ratio / totalOtherRatio;
+                        item.ratio = Math.max(0, item.ratio - (diff * proportion));
+                    }
+                });
+            }
+            updateAll();
+        }
+
+        function updateAll() {
+            const netTotal = Math.round(state.area * state.unitPrice);
+            const managementFee = Math.round(netTotal * 0.1);
+            const tax = Math.round((netTotal + managementFee) * 0.05);
+            const grossTotal = netTotal + managementFee + tax; 
+
+            const activeItems = state.items.filter(i => i.isEnabled);
+            let runningTotal = 0;
+            
+            let targetItemForDiff = activeItems.find(i => i.id === 'other');
+            if (!targetItemForDiff && activeItems.length > 0) {
+                targetItemForDiff = activeItems[activeItems.length - 1];
+            }
+
+            activeItems.forEach((item) => {
+                if (item !== targetItemForDiff) {
+                    item.amount = Math.round(netTotal * (item.ratio / 100));
+                    runningTotal += item.amount;
+                }
+            });
+
+            if (targetItemForDiff) {
+                targetItemForDiff.amount = netTotal - runningTotal;
+            }
+
+            state.items.filter(i => !i.isEnabled).forEach(item => item.amount = 0);
+
+            document.getElementById('sumNetTotal').textContent = 'NT$ ' + formatCurrency(netTotal);
+            document.getElementById('sumManagement').textContent = 'NT$ ' + formatCurrency(managementFee);
+            document.getElementById('sumTax').textContent = 'NT$ ' + formatCurrency(tax);
+            document.getElementById('sumGrossTotal').textContent = formatCurrency(grossTotal);
+            
+            renderTable();
+            renderCharts();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('budgetTableBody');
+            let html = '';
+            let index = 1;
+
+            state.items.forEach((item) => {
+                const amount = item.amount || 0;
+                const isOff = !item.isEnabled;
+                const rowClass = isOff ? 'opacity-40 bg-gray-50' : 'bg-white hover:bg-gray-50';
+
+                html += `
+                <tr class="border-b border-gray-200 ${rowClass} transition-colors">
+                    <td class="py-5 px-6 text-brand-gray font-mono text-center">${String(index).padStart(2, '0')}</td>
+                    <td class="py-5 px-6 font-bold text-brand-black">${item.name}</td>
+                    <td class="py-5 px-6 text-brand-gray text-sm">${item.desc}</td>
+                    <td class="py-5 px-6">
+                        <div class="flex flex-col items-end gap-2">
+                            <div class="flex items-center gap-1">
+                                <input type="number" value="${item.ratio.toFixed(1)}" onchange="handleRatioChange('${item.id}', this.value)" ${isOff ? 'disabled' : ''} class="w-16 bg-transparent border border-gray-300 rounded px-2 py-1 text-sm text-right font-medium print:border-none print:p-0">
+                                <span class="text-brand-gray text-sm font-medium">%</span>
+                            </div>
+                            <input type="range" min="0" max="100" step="0.1" value="${item.ratio}" oninput="handleRatioChange('${item.id}', this.value)" ${isOff ? 'disabled' : ''} class="w-full max-w-[120px] print:hidden">
+                        </div>
+                    </td>
+                    <td class="py-5 px-6 text-right font-bold text-brand-black tracking-wide">$ ${formatNum(amount)}</td>
+                    <td class="py-5 px-6 text-center print:hidden">
+                        <button onclick="handleToggle('${item.id}')" class="text-gray-400 hover:text-brand-black transition-colors p-2">
+                            <i data-lucide="${isOff ? 'eye-off' : 'eye'}" class="w-5 h-5 mx-auto"></i>
+                        </button>
+                    </td>
+                </tr>`;
+                index++;
+            });
+            tbody.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function renderCharts() {
+            const activeItems = state.items.filter(i => i.isEnabled);
+            const labels = activeItems.map(i => i.name);
+            const data = activeItems.map(i => i.amount);
+            const barCtx = document.getElementById('barChart').getContext('2d');
+            
+            if (barChartInstance) {
+                barChartInstance.data.labels = labels;
+                barChartInstance.data.datasets[0].data = data;
+                barChartInstance.update();
+            } else {
+                Chart.defaults.font.family = '"Noto Sans TC", sans-serif';
+                barChartInstance = new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: '#111827',
+                            hoverBackgroundColor: '#374151',
+                            borderRadius: 0,
+                            barPercentage: 0.7,
+                            categoryPercentage: 0.8
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'x',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                titleColor: '#ffffff',
+                                bodyColor: '#ffffff',
+                                padding: 12,
+                                callbacks: { label: (c) => ` 預算: $ ${formatNum(c.raw)}` }
+                            }
+                        },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { color: '#4b5563', maxRotation: 45, minRotation: 45 } },
+                            y: { grid: { color: '#e5e7eb', drawBorder: false }, ticks: { color: '#9ca3af', callback: (v) => formatNum(v) } }
+                        }
+                    }
+                });
+            }
+        }
+
+        window.exportToCSV = function() {
+            const activeItems = state.items.filter(i => i.isEnabled);
+            const netTotal = Math.round(state.area * state.unitPrice);
+            const managementFee = Math.round(netTotal * 0.1);
+            const tax = Math.round((netTotal + managementFee) * 0.05);
+            const grossTotal = netTotal + managementFee + tax;
+            let csvContent = "\uFEFF專案名稱,裝修坪數,每坪單價\n";
+            csvContent += `${state.projectName},${state.area},${state.unitPrice}\n\n`;
+            csvContent += "工程項目,百分比(%),預算金額(TWD)\n";
+            activeItems.forEach(i => csvContent += `${i.name},${i.ratio.toFixed(2)}%,${i.amount || 0}\n`);
+            csvContent += `\n未稅工程總額,,${Math.round(netTotal)}\n工程監管費(10%),,${Math.round(managementFee)}\n營業稅(5%),,${Math.round(tax)}\n含稅總預算,,${Math.round(grossTotal)}\n`;
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${state.projectName || 'INTOCANAAN'}_預算分配表.csv`;
+            link.click();
+        }
+
+        window.exportToJSON = function() {
+            const dataStr = JSON.stringify(state, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${state.projectName || 'INTOCANAAN'}_預算分配表.json`;
+            link.click();
+        }
+
+        window.importFromJSON = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedState = JSON.parse(e.target.result);
+                    if (importedState && importedState.items) {
+                        state = importedState;
+                        document.getElementById('projectName').value = state.projectName;
+                        document.getElementById('area').value = state.area;
+                        document.getElementById('areaSlider').value = state.area;
+                        document.getElementById('unitPriceInput').value = state.unitPrice;
+                        document.getElementById('unitPriceSlider').value = state.unitPrice;
+                        document.querySelectorAll('.preset-btn').forEach(btn => {
+                            btn.classList.replace('border-brand-black', 'border-gray-300');
+                            btn.classList.remove('bg-gray-50', 'ring-1', 'ring-brand-black');
+                        });
+                        event.target.value = '';
+                        updateAll(); 
+                    }
+                } catch (error) { alert("載入失敗，檔案格式不正確。"); }
+            };
+            reader.readAsText(file);
+        }
+
+        window.addEventListener('DOMContentLoaded', window.initApp);
+
+    </script>
+</body>
+</html>
