@@ -77,6 +77,8 @@
         const IconArrowUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>;
         const IconArrowDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>;
         const IconZap = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>;
+        const IconInsertAbove = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20v-8"/><path d="m8 16 4-4 4 4"/><line x1="4" x2="20" y1="4" y2="4"/></svg>;
+        const IconInsertBelow = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v8"/><path d="m16 8-4 4-4-4"/><line x1="4" x2="20" y1="20" y2="20"/></svg>;
 
         const generateId = () => Math.floor(Math.random() * 10000000).toString();
 
@@ -85,6 +87,33 @@
             "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十",
             "二十一", "二十二", "二十三", "二十四", "二十五", "二十六", "二十七", "二十八", "二十九", "三十"
         ];
+        
+        const DEFAULT_NOTES = `1. 報價有效期限為30天。
+2. 此報價單在客戶回簽後視同正式合約，付款方式依照合約付款。
+3. 此專案依本報價單為主，內容若有變更視之追加減，若超出設定項目或材質視為追加。
+4. 本專案自正式驗收日起保固壹年，保固期內如因施作或材料不良而有所損壞者，本公司應負免費修復之責任；但因不可抗力或非可歸責於本公司之事由造成之損壞，不在此限。`;
+
+        // 🌟 新增：自動調整高度的 Textarea 元件
+        const AutoResizeTextarea = ({ value, onChange, placeholder, className, rows = 1, style = {} }) => {
+            const textareaRef = useRef(null);
+            useEffect(() => {
+                if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto';
+                    textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+                }
+            }, [value]);
+            return (
+                <textarea
+                    ref={textareaRef}
+                    value={value || ""}
+                    onChange={onChange}
+                    placeholder={placeholder}
+                    className={`resize-none overflow-hidden align-middle leading-snug outline-none transition-colors ${className}`}
+                    rows={rows}
+                    style={{ minHeight: '32px', ...style }}
+                />
+            );
+        };
 
         function App() {
             // --- 狀態管理 ---
@@ -96,7 +125,7 @@
             ];
             const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
             const [projectInfo, setProjectInfo] = useState({
-                projectId: "", projectName: "", budgetTitle: "", date: new Date().toISOString().split('T')[0]
+                projectId: "", projectName: "", budgetTitle: "", date: new Date().toISOString().split('T')[0], notes: DEFAULT_NOTES
             });
             const [targetBudgets, setTargetBudgets] = useState({});
             const [managementFeeRate, setManagementFeeRate] = useState(10);
@@ -113,7 +142,7 @@
             
             const fileInputRef = useRef(null);
             const csvInputRef = useRef(null);
-            const txtInputRef = useRef(null); // 🌟 新增 TXT 檔案匯入的 Reference
+            const txtInputRef = useRef(null); 
 
             // Google Drive 狀態
             const [tokenClient, setTokenClient] = useState(null);
@@ -123,16 +152,16 @@
             const [cloudFiles, setCloudFiles] = useState([]);
             const [isFetchingFiles, setIsFetchingFiles] = useState(false);
 
-            // 🌟 廠商報價匯入狀態
+            // 廠商報價匯入狀態
             const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
             const [vendorNameInput, setVendorNameInput] = useState("");
             const [vendorTextInput, setVendorTextInput] = useState("");
 
-            // 🌟 數量計算表連動狀態
+            // 數量計算表連動狀態
             const [isQuantityModalOpen, setIsQuantityModalOpen] = useState(false);
             const [quantityTextInput, setQuantityTextInput] = useState("");
 
-            const [printMode, setPrintMode] = useState('quote'); // 'quote' or 'internal'
+            const [printMode, setPrintMode] = useState('quote'); 
 
             useEffect(() => {
                 let isMounted = true;
@@ -252,7 +281,7 @@
                     });
                     const parsed = await res.json();
                     
-                    if (parsed.projectInfo) setProjectInfo(parsed.projectInfo);
+                    if (parsed.projectInfo) setProjectInfo({...parsed.projectInfo, notes: parsed.projectInfo.notes !== undefined ? parsed.projectInfo.notes : DEFAULT_NOTES});
                     if (parsed.items) setItems(parsed.items);
                     if (parsed.targetBudgets) setTargetBudgets(parsed.targetBudgets);
                     if (parsed.managementFeeRate !== undefined) setManagementFeeRate(parsed.managementFeeRate);
@@ -339,8 +368,58 @@
                 }]);
             };
 
+            // 🌟 處理向上 / 向下插入多筆空工項
+            const handleInsertItem = (targetId, direction) => {
+                const countStr = window.prompt("請輸入要新增的工項數量：", "1");
+                if (countStr === null) return; 
+                const count = parseInt(countStr, 10);
+                if (isNaN(count) || count <= 0) return alert("請輸入有效的正整數！");
+
+                const itemIndexInGlobal = items.findIndex(i => i.id === targetId);
+                if (itemIndexInGlobal < 0) return;
+
+                const targetItem = items[itemIndexInGlobal];
+
+                const newItemsToInsert = Array.from({ length: count }).map(() => ({
+                    id: generateId() + Math.random().toString(36).substr(2, 5),
+                    sheetName: activeSheet,
+                    status: "○○",
+                    name: "",
+                    category: targetItem.category || "", 
+                    provider: targetItem.provider || "暫時估價",
+                    internalNote: "",
+                    note: "",
+                    quantity: 1,
+                    unit: "式",
+                    unitCost: 0,
+                    unitPrice: 0
+                }));
+
+                // 為了確保是在同一個 Sheet 中依序插入，計算相對位置
+                const insertIndex = direction === 'above' ? itemIndexInGlobal : itemIndexInGlobal + 1;
+                const newItemsList = [...items];
+                newItemsList.splice(insertIndex, 0, ...newItemsToInsert);
+                setItems(newItemsList);
+            };
+
             const handleItemChange = (id, field, value) => {
                 setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
+            };
+
+            // 🌟 處理毛利率自動換算報價 (報價 = 成本 / (1 - 毛利率))
+            const handleMarginChange = (id, newMarginStr) => {
+                let margin = parseFloat(newMarginStr);
+                if (isNaN(margin)) margin = 0;
+                if (margin < 0) margin = 0;
+                if (margin >= 100) margin = 99.9; 
+
+                setItems(items.map(item => {
+                    if (item.id === id) {
+                        const newPrice = item.unitCost === 0 ? 0 : Math.round(item.unitCost / (1 - (margin / 100)));
+                        return { ...item, unitPrice: newPrice };
+                    }
+                    return item;
+                }));
             };
 
             const handleRemoveItem = (id) => setItems(items.filter(item => item.id !== id));
@@ -407,7 +486,6 @@
                 }
             };
 
-            // 🌟 處理廠商報價智能匯入
             const processVendorImport = () => {
                 if (!vendorTextInput.trim()) {
                     alert("請貼上文字內容！");
@@ -418,29 +496,25 @@
                 let parsedItems = [];
                 let successCount = 0;
                 
-                // 常見單位庫 (擴充以提升準確率)
                 const commonUnits = ['式', '一式', '坪', '樘', '尺', '公尺', 'm', 'cm', '組', '台', '才', '迴', '處', '口', '趟', '份', '個', '套', '批', '間', '車', '車次', '工', '天', 'm2', '才/尺', '片', '支', '式/月', '月'];
 
                 lines.forEach(line => {
-                    // 漸進式分割邏輯
                     let parts = line.split(/\t/).map(p => p.trim()).filter(p => p !== '');
                     if (parts.length <= 1 && line.includes(',')) {
                         parts = line.split(/,/).map(p => p.trim()).filter(p => p !== '');
                     }
                     if (parts.length <= 1) {
-                        parts = line.split(/(?:\s{2,}|　+)/).map(p => p.trim()).filter(p => p !== '');
+                        parts = line.split(/(?:\s{2,}| +)/).map(p => p.trim()).filter(p => p !== '');
                     }
                     if (parts.length <= 1) {
                         parts = line.split(/\s+/).map(p => p.trim()).filter(p => p !== '');
                     }
 
                     if (parts.length > 0) {
-                        // 清除開頭可能誤判的項次編號 (例如: 1, 1., (1), 01, 1-1)
                         if (parts.length > 1 && /^(\(?\d+[\.\-、\)]?)$/.test(parts[0])) {
                             parts.shift();
                         }
 
-                        // 🌟 嚴格數字判定：排除夾雜中文或英文的備註文字 (如 "含批土2次")，避免誤判為單價/數量
                         const isStrictNum = (str) => {
                             let cleanStr = str.replace(/[,$NTnt]/g, '');
                             return cleanStr !== '' && !isNaN(cleanStr) && /^[\d]+(\.[\d]+)?$/.test(cleanStr);
@@ -453,31 +527,26 @@
                         let uIdx = parts.findIndex(p => commonUnits.includes(p));
                         let qIdx = -1;
                         let pIdx = -1;
-                        let sIdx = -1; // 用於捕捉 Subtotal (小計/複價)，避免它掉進備註欄
+                        let sIdx = -1; 
 
                         if (nums.length === 1) {
                             pIdx = nums[0];
                         } else if (nums.length >= 2) {
                             if (uIdx !== -1) {
-                                // 找單位前面的數字當作數量
                                 if (nums.includes(uIdx - 1)) qIdx = uIdx - 1;
-                                // 找單位後面的第一個數字當作單價
                                 let afterUnit = nums.find(n => n > uIdx);
                                 if (afterUnit) pIdx = afterUnit;
                             } else {
-                                // 沒單位時，依序當作數量跟單價
                                 qIdx = nums[0];
                                 pIdx = nums[1];
                             }
                         }
 
-                        // 補救措施：如果有數字但沒分配到 pIdx，強制指定最後一個數字為單價
                         if (pIdx === -1 && nums.length > 0) {
                             pIdx = nums[nums.length - 1];
                         }
-                        if (qIdx === pIdx) qIdx = -1; // 避免數量跟單價重疊
+                        if (qIdx === pIdx) qIdx = -1; 
 
-                        // 🌟 捕捉複價/小計 (接在單價後面的下一個純數字)
                         if (pIdx !== -1) {
                             let nextNumIdx = nums.find(n => n > pIdx);
                             if (nextNumIdx === pIdx + 1) {
@@ -489,17 +558,13 @@
                         let price = pIdx !== -1 ? getNum(parts[pIdx]) : 0;
                         let unit = uIdx !== -1 ? parts[uIdx] : '式';
 
-                        // 決定擷取名稱與備註的邊界
                         let usedIndices = [qIdx, uIdx, pIdx, sIdx].filter(i => i !== -1);
                         let firstSpecial = usedIndices.length > 0 ? Math.min(...usedIndices) : parts.length;
                         let lastSpecial = usedIndices.length > 0 ? Math.max(...usedIndices) : -1;
 
                         let name = parts.slice(0, firstSpecial).join(' ') || '未命名';
-                        
-                        // 🌟 備註只取最後一個識別物之後的所有內容 (確保複價、總計等數字已被過濾，不會寫入備註)
                         let note = usedIndices.length > 0 ? parts.slice(lastSpecial + 1).join(' ') : '';
 
-                        // 最終防呆：確保單位不要太長
                         if (unit && unit.length > 4) {
                             note = (unit + " " + note).trim();
                             unit = "式";
@@ -535,19 +600,17 @@
                 }
             };
 
-            // 🌟 處理 TXT / CSV 檔案快速載入至數量計算文字框
             const handleImportTXT = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    setQuantityTextInput(event.target.result); // 將檔案內容載入 Textarea 中供預覽
+                    setQuantityTextInput(event.target.result); 
                 };
                 reader.readAsText(file, "UTF-8");
-                e.target.value = null; // 重置 input 狀態
+                e.target.value = null; 
             };
 
-            // 🌟 處理數量計算表智能連動
             const processQuantityImport = () => {
                 if (!quantityTextInput.trim()) {
                     alert("請貼上文字內容！");
@@ -560,20 +623,17 @@
                 let qtyMap = {};
 
                 lines.forEach(line => {
-                    // 切割邏輯，支援 Excel (Tab) 或是 CSV (逗號)、手打空白
                     let parts = line.split(/\t/).map(p => p.trim()).filter(p => p !== '');
                     if (parts.length <= 1 && line.includes(',')) parts = line.split(/,/).map(p => p.trim()).filter(p => p !== '');
-                    if (parts.length <= 1) parts = line.split(/(?:\s{2,}|　+)/).map(p => p.trim()).filter(p => p !== '');
+                    if (parts.length <= 1) parts = line.split(/(?:\s{2,}| +)/).map(p => p.trim()).filter(p => p !== '');
                     if (parts.length <= 1) parts = line.split(/\s+/).map(p => p.trim()).filter(p => p !== '');
 
                     if (parts.length >= 2) {
-                        // 清除開頭可能誤判的項次編號
                         if (/^(\(?\d+[\.\-、\)]?)$/.test(parts[0])) parts.shift();
                         
                         let name = parts[0];
                         let qty = null;
                         
-                        // 尋找陣列中的第一個純數字作為數量
                         for (let j = 1; j < parts.length; j++) {
                             let cleanStr = parts[j].replace(/[,$NTnt]/g, '');
                             if (cleanStr !== '' && !isNaN(cleanStr) && /^[\d]+(\.[\d]+)?$/.test(cleanStr)) {
@@ -583,13 +643,11 @@
                         }
                         
                         if (name && qty !== null) {
-                            // 去除所有空白以增加配對容錯率 (例如: "油漆工程" 可配對 "油 漆 工 程")
                             qtyMap[name.replace(/\s+/g, '')] = qty;
                         }
                     }
                 });
 
-                // 配對並更新現有工項的數量
                 newItems = newItems.map(item => {
                     const cleanItemName = item.name.replace(/\s+/g, '');
                     if (cleanItemName && qtyMap[cleanItemName] !== undefined) {
@@ -609,7 +667,6 @@
                 }
             };
 
-            // --- 檔案匯入匯出 ---
             const handleExportJSON = () => {
                 const data = JSON.stringify({ projectInfo, categories, items, targetBudgets, managementFeeRate, includeTax, designFee }, null, 2);
                 const blob = new Blob(["\uFEFF" + data], { type: "application/json;charset=utf-8" });
@@ -628,7 +685,7 @@
                 reader.onload = (event) => {
                     try {
                         const parsed = JSON.parse(event.target.result);
-                        if (parsed.projectInfo) setProjectInfo(parsed.projectInfo);
+                        if (parsed.projectInfo) setProjectInfo({...parsed.projectInfo, notes: parsed.projectInfo.notes !== undefined ? parsed.projectInfo.notes : DEFAULT_NOTES});
                         if (parsed.items) setItems(parsed.items);
                         if (parsed.targetBudgets) setTargetBudgets(parsed.targetBudgets);
                         if (parsed.managementFeeRate !== undefined) setManagementFeeRate(parsed.managementFeeRate);
@@ -773,7 +830,7 @@
             return (
                 <div className="min-h-screen px-4 py-6 md:px-12 lg:px-24 xl:px-32 print-container w-full mx-auto relative">
                     
-                    {/* 🌟 廠商報價智能匯入 Modal */}
+                    {/* 廠商報價智能匯入 Modal */}
                     {isVendorModalOpen && (
                         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity no-print">
                             <div className="bg-white p-8 max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl rounded-xl border border-gray-200">
@@ -833,7 +890,7 @@
                         </div>
                     )}
 
-                    {/* 🌟 數量計算表連動 Modal */}
+                    {/* 數量計算表連動 Modal */}
                     {isQuantityModalOpen && (
                         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity no-print">
                             <div className="bg-white p-8 max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl rounded-xl border border-gray-200">
@@ -962,7 +1019,6 @@
                             <button onClick={() => csvInputRef.current.click()} className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded shadow-sm hover:bg-amber-100 text-sm font-bold transition">
                                 <IconLink /> 匯入預算分配表 (前期規劃)
                             </button>
-                            {/* 🌟 新增的數量計算表連動按鈕 */}
                             <button onClick={() => setIsQuantityModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded shadow-sm hover:bg-emerald-100 text-sm font-bold transition">
                                 <IconZap /> 智能連動數量計算
                             </button>
@@ -1001,7 +1057,7 @@
                     </div>
 
                     {/* 專案資訊卡片 */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8 no-print">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 no-print">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">專案編號</label>
@@ -1020,6 +1076,17 @@
                                 <input type="date" value={projectInfo.date} onChange={e => setProjectInfo({...projectInfo, date: e.target.value})} className="w-full border-b border-gray-300 focus:border-blue-500 outline-none pb-1 font-medium" />
                             </div>
                         </div>
+                    </div>
+
+                    {/* 🌟 新增：報價單備註設定區塊 */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8 no-print">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">報價單備註說明 (列印或輸出 PDF 將顯示此內容)</label>
+                        <AutoResizeTextarea
+                            value={projectInfo.notes !== undefined ? projectInfo.notes : DEFAULT_NOTES}
+                            onChange={e => setProjectInfo({...projectInfo, notes: e.target.value})}
+                            className="w-full border border-gray-300 rounded p-3 text-sm focus:border-blue-500"
+                            rows={4}
+                        />
                     </div>
 
                     {/* --- 列印視圖：展開所有分類 --- */}
@@ -1086,14 +1153,10 @@
                                 </div>
                             </div>
 
+                            {/* 🌟 更新為套用使用者自訂備註 */}
                             <div className="mt-12 text-xs text-gray-700 leading-relaxed border border-gray-300 p-5 rounded-lg">
                                 <p className="font-bold mb-2 text-sm text-gray-900">【備註說明】</p>
-                                <ol className="list-decimal pl-5 space-y-1.5">
-                                    <li>報價有效期限為30天。</li>
-                                    <li>此報價單在客戶回簽後視同正式合約，付款方式依照合約付款。</li>
-                                    <li>此專案依本報價單為主，內容若有變更視之追加減，若超出設定項目或材質視為追加。</li>
-                                    <li>本專案自正式驗收日起保固壹年，保固期內如因施作或材料不良而有所損壞者，本公司應負免費修復之責任；但因不可抗力或非可歸責於本公司之事由造成之損壞，不在此限。</li>
-                                </ol>
+                                <div className="whitespace-pre-wrap">{projectInfo.notes !== undefined ? projectInfo.notes : DEFAULT_NOTES}</div>
                             </div>
                         </div>
                         
@@ -1168,7 +1231,6 @@
                                                         </React.Fragment>
                                                     );
                                                 })}
-                                                {/* 將原本的 tfoot 小計改為 tbody 內的最後一列，避免跨頁重複顯示 */}
                                                 <tr>
                                                     <td colSpan={printMode === 'internal' ? "4" : "6"} className="text-right font-bold py-2 border-t border-gray-300">本項工程小計：</td>
                                                     {printMode === 'internal' ? (
@@ -1262,17 +1324,17 @@
                                     <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200">
                                         <tr>
                                             <th className="px-4 py-3 w-16 text-center">項次</th>
-                                            <th className="px-4 py-3 min-w-[200px]">項目名稱 *</th>
-                                            <th className="px-4 py-3 w-32">分類</th>
-                                            <th className="px-4 py-3 w-32">廠商</th>
-                                            <th className="px-4 py-3 min-w-[150px]">報價備註</th>
-                                            <th className="px-4 py-3 w-32 min-w-[120px] text-right">數量</th>
+                                            <th className="px-4 py-3 min-w-[220px]">項目名稱 *</th>
+                                            <th className="px-4 py-3 min-w-[130px]">分類</th>
+                                            <th className="px-4 py-3 min-w-[130px]">廠商</th>
+                                            <th className="px-4 py-3 min-w-[180px]">報價備註</th>
+                                            <th className="px-4 py-3 w-32 min-w-[100px] text-right">數量</th>
                                             <th className="px-4 py-3 w-20 text-center">單位</th>
-                                            <th className="px-4 py-3 w-40 min-w-[140px] text-right text-orange-600">單位成本</th>
-                                            <th className="px-4 py-3 w-40 min-w-[140px] text-right text-blue-600">單位報價</th>
-                                            <th className="px-4 py-3 w-32 text-right">小計報價</th>
-                                            <th className="px-4 py-3 w-20 text-right text-green-600">毛利率</th>
-                                            <th className="px-4 py-3 w-28 text-center">操作</th>
+                                            <th className="px-4 py-3 w-40 min-w-[130px] text-right text-orange-600">單位成本</th>
+                                            <th className="px-4 py-3 w-40 min-w-[130px] text-right text-blue-600">單位報價</th>
+                                            <th className="px-4 py-3 w-32 min-w-[120px] text-right">小計報價</th>
+                                            <th className="px-4 py-3 w-32 min-w-[110px] text-center text-green-600">設定毛利率</th>
+                                            <th className="px-4 py-3 w-36 text-center">操作</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -1297,42 +1359,70 @@
                                                     {itemsInCat.map((item, itemIdx) => (
                                                         <tr key={item.id} className="hover:bg-gray-50 transition">
                                                             <td className="px-4 py-2 text-center font-medium text-gray-500">{itemIdx + 1}</td>
+                                                            
+                                                            {/* 🌟 修改：替換為自動換行 Textarea */}
                                                             <td className="px-4 py-2">
-                                                                <textarea 
-                                                                    value={item.name} 
-                                                                    onChange={e => {
-                                                                        handleItemChange(item.id, 'name', e.target.value);
-                                                                        e.target.style.height = 'auto'; e.target.style.height = (e.target.scrollHeight) + 'px';
-                                                                    }}
-                                                                    placeholder="輸入工項名稱..." 
-                                                                    className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500 font-medium resize-none overflow-hidden align-middle leading-snug" 
-                                                                    rows="1" style={{ minHeight: '34px' }}
+                                                                <AutoResizeTextarea
+                                                                    value={item.name}
+                                                                    onChange={e => handleItemChange(item.id, 'name', e.target.value)}
+                                                                    placeholder="輸入工項名稱..."
+                                                                    className="w-full border border-gray-200 rounded px-2 py-1 focus:border-blue-500 font-medium whitespace-pre-wrap"
                                                                 />
                                                             </td>
-                                                            <td className="px-4 py-2"><input type="text" value={item.category} onChange={e => handleItemChange(item.id, 'category', e.target.value)} placeholder="分類群組" className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500 text-xs" /></td>
-                                                            <td className="px-4 py-2"><input type="text" value={item.provider} onChange={e => handleItemChange(item.id, 'provider', e.target.value)} className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500 text-xs" /></td>
                                                             <td className="px-4 py-2">
-                                                                <textarea 
-                                                                    value={item.note} 
-                                                                    onChange={e => {
-                                                                        handleItemChange(item.id, 'note', e.target.value);
-                                                                        e.target.style.height = 'auto'; e.target.style.height = (e.target.scrollHeight) + 'px';
-                                                                    }}
-                                                                    placeholder="尺寸/規格..." 
-                                                                    className="w-full border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500 text-xs text-gray-500 resize-none overflow-hidden align-middle leading-snug" 
-                                                                    rows="1" style={{ minHeight: '30px' }}
+                                                                <AutoResizeTextarea
+                                                                    value={item.category}
+                                                                    onChange={e => handleItemChange(item.id, 'category', e.target.value)}
+                                                                    placeholder="分類群組"
+                                                                    className="w-full border border-gray-200 rounded px-2 py-1 focus:border-blue-500 text-xs whitespace-pre-wrap"
                                                                 />
                                                             </td>
+                                                            <td className="px-4 py-2">
+                                                                <AutoResizeTextarea
+                                                                    value={item.provider}
+                                                                    onChange={e => handleItemChange(item.id, 'provider', e.target.value)}
+                                                                    placeholder="廠商名稱"
+                                                                    className="w-full border border-gray-200 rounded px-2 py-1 focus:border-blue-500 text-xs whitespace-pre-wrap"
+                                                                />
+                                                            </td>
+                                                            <td className="px-4 py-2">
+                                                                <AutoResizeTextarea
+                                                                    value={item.note}
+                                                                    onChange={e => handleItemChange(item.id, 'note', e.target.value)}
+                                                                    placeholder="尺寸/規格..."
+                                                                    className="w-full border border-gray-200 rounded px-2 py-1 focus:border-blue-500 text-xs text-gray-500 whitespace-pre-wrap"
+                                                                />
+                                                            </td>
+                                                            
                                                             <td className="px-4 py-2"><input type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', parseFloat(e.target.value) || 0)} className="w-full text-right border border-gray-200 rounded px-2 py-1 outline-none focus:border-blue-500" min="0" step="0.1" /></td>
                                                             <td className="px-4 py-2"><input type="text" value={item.unit} onChange={e => handleItemChange(item.id, 'unit', e.target.value)} className="w-full text-center border border-gray-200 rounded px-1 py-1 outline-none focus:border-blue-500" /></td>
                                                             <td className="px-4 py-2"><input type="number" value={item.unitCost} onChange={e => handleItemChange(item.id, 'unitCost', parseFloat(e.target.value) || 0)} className="w-full text-right border border-orange-200 bg-orange-50 rounded px-2 py-1 outline-none focus:border-orange-500 text-orange-700" min="0" step="100" /></td>
                                                             <td className="px-4 py-2"><input type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)} className="w-full text-right border border-blue-200 bg-blue-50 rounded px-2 py-1 outline-none focus:border-blue-500 text-blue-700 font-bold" min="0" step="100" /></td>
                                                             <td className="px-4 py-2 text-right font-bold text-gray-800">{formatCurrency(item.quantity * item.unitPrice)}</td>
-                                                            <td className="px-4 py-2 text-right font-bold text-green-600 bg-green-50/50">{item.unitPrice > 0 ? (((item.unitPrice - item.unitCost) / item.unitPrice) * 100).toFixed(1) : "0.0"}%</td>
-                                                            <td className="px-4 py-2 text-center whitespace-nowrap">
-                                                                <button onClick={() => handleMoveItem(item.id, 'up')} className="text-gray-400 hover:text-blue-600 transition p-1" title="上移"><IconArrowUp /></button>
-                                                                <button onClick={() => handleMoveItem(item.id, 'down')} className="text-gray-400 hover:text-blue-600 transition p-1" title="下移"><IconArrowDown /></button>
-                                                                <button onClick={() => handleRemoveItem(item.id)} className="text-red-400 hover:text-red-600 transition p-1" title="刪除"><IconTrash2 /></button>
+                                                            
+                                                            {/* 🌟 修改：毛利率欄位改為可輸入運算 */}
+                                                            <td className="px-4 py-2">
+                                                                <div className="flex items-center justify-end bg-green-50/50 rounded border border-green-200 focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition px-1 py-1">
+                                                                    <input 
+                                                                        type="number"
+                                                                        value={item.unitPrice > 0 ? (((item.unitPrice - item.unitCost) / item.unitPrice) * 100).toFixed(1) : ""} 
+                                                                        onChange={(e) => handleMarginChange(item.id, e.target.value)}
+                                                                        className="w-full text-right bg-transparent outline-none text-green-700 font-bold" 
+                                                                        min="0" max="99.9" step="0.1" placeholder="0.0"
+                                                                        title="輸入毛利率(%)自動換算單價"
+                                                                    />
+                                                                    <span className="text-green-700 font-bold ml-1">%</span>
+                                                                </div>
+                                                            </td>
+
+                                                            {/* 🌟 修改：加入向上與向下新增的功能與按鈕 */}
+                                                            <td className="px-4 py-2 text-center whitespace-nowrap flex items-center justify-center gap-1.5 min-h-[38px]">
+                                                                <button onClick={() => handleInsertItem(item.id, 'above')} className="text-emerald-500 hover:text-emerald-700 transition p-1 hover:bg-emerald-50 rounded" title="向上方新增一/多列"><IconInsertAbove /></button>
+                                                                <button onClick={() => handleInsertItem(item.id, 'below')} className="text-emerald-500 hover:text-emerald-700 transition p-1 hover:bg-emerald-50 rounded" title="向下方新增一/多列"><IconInsertBelow /></button>
+                                                                <div className="w-[1px] h-4 bg-gray-300 mx-1"></div>
+                                                                <button onClick={() => handleMoveItem(item.id, 'up')} className="text-gray-400 hover:text-blue-600 transition p-1 hover:bg-blue-50 rounded" title="將此項上移"><IconArrowUp /></button>
+                                                                <button onClick={() => handleMoveItem(item.id, 'down')} className="text-gray-400 hover:text-blue-600 transition p-1 hover:bg-blue-50 rounded" title="將此項下移"><IconArrowDown /></button>
+                                                                <button onClick={() => handleRemoveItem(item.id)} className="text-red-400 hover:text-red-600 transition p-1 hover:bg-red-50 rounded ml-1" title="刪除此項"><IconTrash2 /></button>
                                                             </td>
                                                         </tr>
                                                     ))}
@@ -1342,10 +1432,9 @@
                                         <tr className="bg-gray-50">
                                             <td colSpan="12" className="px-4 py-4 flex gap-3 flex-wrap">
                                                 <button onClick={handleAddItem} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 hover:text-blue-600 hover:border-blue-400 rounded-lg font-medium text-sm transition shadow-sm">
-                                                    <IconPlus /> 手動新增一筆
+                                                    <IconPlus /> 於底部新增一筆
                                                 </button>
                                                 
-                                                {/* 🌟 新增的廠商報價匯入按鈕 */}
                                                 <button onClick={() => setIsVendorModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg font-medium text-sm transition shadow-sm group">
                                                     <IconZap /> 智能貼上 / 匯入廠商報價
                                                 </button>
